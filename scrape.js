@@ -16,11 +16,29 @@ const scrapeMedia = async () => {
   try {
     await page.goto(targetUrl, { waitUntil: 'networkidle2' });
 
+    // scroll through the page
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        let distance = 100;
+        let timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= document.body.scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+
     // Extract media elements (images and videos)
     const media = await page.evaluate(() => {
       const images = Array.from(document.querySelectorAll('img')).map((img) => ({
         type: 'image',
         src: img.src,
+        srcset: img.srcset,
         alt: img.alt || 'No alt text',
       }));
 
@@ -31,7 +49,13 @@ const scrapeMedia = async () => {
         autoplay: video.hasAttribute('autoplay'),
       }));
 
-      return [...images, ...videos];
+      const audios = Array.from(document.querySelectorAll('audio')).map((audio) => ({
+        type: 'audio',
+        src: audio.src || audio.getAttribute('data-src'),
+        id: audio.id || 'No ID',
+      }));
+
+      return [...images, ...videos, ...audios];
     });
 
     // Save the media data to a JSON file
